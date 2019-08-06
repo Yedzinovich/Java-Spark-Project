@@ -7,7 +7,7 @@ public class Course {
     private String name;
     private String url;
 
-    Course(String name, String url){
+    public Course(String name, String url){
         this.name = name;
         this.url= url;
     }
