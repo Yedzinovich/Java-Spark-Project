@@ -11,14 +11,14 @@ import static org.junit.Assert.*;
 
 public class sql2oCourseDaoTest {
 
-    private sql2oCourseDao dao;
+    private Sql2oCourseDao dao;
     private Connection conn;
 
     @Before
     public void setUp() throws Exception {
         String connectionString = "jdbc:h2:mem:testing;INIT=RUNSCRIPT from 'classpath:db/init.sql'";
         Sql2o sql2o = new Sql2o(connectionString, "", "");
-        dao = new sql2oCourseDao(sql2o);
+        dao = new Sql2oCourseDao(sql2o);
         //Keep connection open through the test
         conn = sql2o.open();
     }

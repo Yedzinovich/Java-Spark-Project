@@ -1,10 +1,13 @@
 package com.inna.courses;
 
 import com.google.gson.Gson;
-import com.inna.courses.dao.sql2oCourseDao;
+import com.inna.courses.dao.Sql2oCourseDao;
+import com.inna.courses.dao.Sql2oReviewDao;
 import com.inna.models.Course;
+import com.inna.models.Review;
 import com.inna.testing.ApiClient;
 import com.inna.testing.ApiResponse;
+import com.sun.javafx.collections.MappingChange;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -25,7 +28,8 @@ public class ApiTest {
     private Connection conn;
     private ApiClient client;
     private Gson gson;
-    private sql2oCourseDao courseDao;
+    private Sql2oCourseDao courseDao;
+    private Sql2oReviewDao reviewDao;
 
     @AfterClass
     public static void startServer() {
@@ -41,7 +45,8 @@ public class ApiTest {
     @Before
     public void setUp() throws Exception {
         Sql2o sql2o = new Sql2o(TEST_DATASOURCE + ";INIT=RUNSCRIPT from 'classpath:db/init.sql'", "", "");
-        courseDao = new sql2oCourseDao(sql2o);
+        courseDao = new Sql2oCourseDao(sql2o);
+        reviewDao = new Sql2oReviewDao(sql2o);
         conn = sql2o.open();
         client = new ApiClient("http://localhost:" + PORT);
         gson = new Gson();
@@ -64,12 +69,42 @@ public class ApiTest {
     }
 
     @Test
+    public void addingReviewUnknownCourseThrowsError() throws Exception {
+        Map<String, Object> values = new HashMap<>();
+        values.put("rating", 5);
+        values.put("comment", "Test comment");
+
+        ApiResponse res = client.request("POST",
+                String.format("/courses/42/reviews"),
+                gson.toJson(values));
+
+        assertEquals(500, res.getStatus());
+    }
+
+    @Test
+    public void addingReviewGivesCreatedStatus() throws Exception {
+        Course course = newTestCourse();
+        courseDao.add(course);
+        Map<String, Object> values = new HashMap<>();
+        values.put("rating", 5);
+        values.put("comment", "Test comment");
+
+        ApiResponse res = client.request("POST",
+                String.format("/courses/%d/reviews", course.getId()),
+                gson.toJson(values));
+
+        assertEquals(201, res.getStatus());
+    }
+
+    @Test
     public void coursesCanBeAccessedById() throws Exception {
         Course course = newTestCourse();
         courseDao.add(course);
 
-        ApiResponse response = client.request("GET", "/courses/" + course.getId());
-        Course retrieved = gson.fromJson(response.getBody(), Course.class);
+        ApiResponse res = client.request("GET",
+                "/courses/" + course.getId());
+        Course retrieved = gson.fromJson(res.getBody(), Course.class);
+
         assertEquals(course, retrieved);
     }
 
@@ -77,6 +112,20 @@ public class ApiTest {
     public void missingCoursesReturnNotFoundStatus() throws Exception {
         ApiResponse response = client.request("GET", "/courses/42");
         assertEquals(404, response.getStatus());
+    }
+
+    @Test
+    public void multipleReviewsReturnedForCourse() throws Exception {
+        Course course = newTestCourse();
+        courseDao.add(course);
+        reviewDao.add(new Review(course.getId(), 5, "Test comment 1"));
+        reviewDao.add(new Review(course.getId(), 4, "Test comment 2"));
+
+        ApiResponse res = client.request("GET",
+                String.format("/courses/%d/reviews", course.getId()));
+        Review[] reviews = gson.fromJson(res.getBody(), Review[].class);
+
+        assertEquals(2, reviews.length);
     }
 
     private Course newTestCourse() {
